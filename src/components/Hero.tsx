@@ -40,10 +40,10 @@ export function Hero({ api }: { api: KeepApi }) {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--muted)' }}>
             <TokenUSDC variant="branded" size={16} />
-            {demo ? 'Demo wallet balance' : 'Your USDC on Arc Testnet'}
+            {demo ? 'Demo wallet balance' : 'Your USDC on Arc mainnet'}
           </div>
           {needsConnect ? (
-            <div className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Connect a wallet to stake real testnet USDC.</div>
+            <div className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>Connect a wallet to stake real USDC on Arc mainnet. Unaudited: small amounts only (max $5/day).</div>
           ) : api.balance === undefined ? (
             <div className="skeleton mt-2 h-8 w-32" />
           ) : (

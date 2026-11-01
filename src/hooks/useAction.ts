@@ -6,11 +6,11 @@ import { parseError } from '@/lib/format'
 import type { OnStep, Step, TxResult } from '@/lib/types'
 
 export const STEP_LABEL: Record<Step, string> = {
-  switch: 'Switching to Arc Testnet...',
+  switch: 'Switching to Arc mainnet...',
   'approve-sign': 'Allow USDC in your wallet...',
   'approve-wait': 'Confirming allowance...',
   sign: 'Confirm in your wallet...',
-  wait: 'Confirming on Arc Testnet...',
+  wait: 'Confirming on Arc mainnet...',
 }
 
 /** Runs one onchain (or demo) action and tracks real wallet / confirmation steps. */

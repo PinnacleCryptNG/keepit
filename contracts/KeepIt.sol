@@ -45,7 +45,7 @@ contract KeepIt is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MIN_STAKE_PER_DAY = 10_000;
-    uint256 public constant MAX_STAKE_PER_DAY = 100_000_000;
+    uint256 public constant MAX_STAKE_PER_DAY = 5_000_000;
     uint256 public constant SETTLE_GRACE = 7 days;
     uint256 private constant SCALE = 1e18;
 

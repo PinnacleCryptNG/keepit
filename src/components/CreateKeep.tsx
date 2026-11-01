@@ -17,7 +17,7 @@ const IDEAS = [
 ]
 const STAKES = ['0.25', '0.5', '1', '2', '5']
 const MIN_STAKE = 10_000n
-const MAX_STAKE = 100_000_000n
+const MAX_STAKE = 5_000_000n
 
 export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => void }) {
   const [name, setName] = useState('')
@@ -123,7 +123,7 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
               <button key={s} className="chip !min-h-[40px]" aria-pressed={stake === s} onClick={() => setStake(s)}>${s}</button>
             ))}
           </div>
-          {stake !== '' && !stakeOk && <p className="mt-2 text-xs" style={{ color: 'var(--danger)' }}>Stake between $0.01 and $100 a day.</p>}
+          {stake !== '' && !stakeOk && <p className="mt-2 text-xs" style={{ color: 'var(--danger)' }}>Stake between $0.01 and $5 a day.</p>}
         </div>
       </section>
 
@@ -150,7 +150,7 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
             : `${demo ? 'Stake (demo)' : 'Stake'} ${usd(total)} on ${duration} days`}
         </button>
         {action.error && <p role="alert" className="text-sm" style={{ color: 'var(--danger)' }}>{action.error}</p>}
-        {insufficient && !demo && <p className="text-xs" style={{ color: 'var(--muted)' }}>Tap "Get test USDC" in the Arc Studio sidebar to top up.</p>}
+        {insufficient && !demo && <p className="text-xs" style={{ color: 'var(--muted)' }}>You need more USDC on Arc mainnet to cover this stake.</p>}
       </section>
     </div>
   )
