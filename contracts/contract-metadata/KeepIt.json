@@ -1,13 +1,27 @@
 {
-  "contractAddress": "0x3c8f6a0f5603a3299c037b6af7d2586d3930b689",
+  "contractAddress": "0x5fae40e4e2becddf868dca65ed109a7bb88b91e2",
   "network": "ARC-TESTNET",
   "deployerWalletId": "3c2464b2-8369-52e2-a782-800bbeca5396",
   "contract_code_path": "/home/user/app/contracts/KeepIt.sol",
   "contract_compiled_code_path": "/home/user/app/contracts/out/KeepIt.sol/KeepIt.json",
   "contract_network_and_links": {
-    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x3c8f6a0f5603a3299c037b6af7d2586d3930b689"
+    "Arc Testnet": "https://explorer.testnet.arc.io/address/0x5fae40e4e2becddf868dca65ed109a7bb88b91e2"
   },
   "contract_deployments": [
+    {
+      "chain": "Arc Testnet",
+      "address": "0x5fae40e4e2becddf868dca65ed109a7bb88b91e2",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x5fae40e4e2becddf868dca65ed109a7bb88b91e2",
+      "txHash": "0x87554e554246fa85998375c318b93a245f401e2166ec7913778fa402ba14f934",
+      "deployedAt": "2026-10-31T07:37:49.265Z"
+    },
+    {
+      "chain": "Arc Testnet",
+      "address": "0x797f3b44dc72d575f61ad3d71c8337b799411e2c",
+      "explorerUrl": "https://explorer.testnet.arc.io/address/0x797f3b44dc72d575f61ad3d71c8337b799411e2c",
+      "txHash": "0x31f4656ee051a2e95b1567fd6d828a77e335eb66cb9f2a1b6f10cfa57c816ee9",
+      "deployedAt": "2026-10-31T07:33:54.161Z"
+    },
     {
       "chain": "Arc Testnet",
       "address": "0x3c8f6a0f5603a3299c037b6af7d2586d3930b689",
@@ -182,6 +196,33 @@
           "name": "stakePerDay",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "rules",
+          "type": "tuple",
+          "internalType": "struct KeepIt.Rules",
+          "components": [
+            {
+              "name": "utcOffsetMinutes",
+              "type": "int16",
+              "internalType": "int16"
+            },
+            {
+              "name": "windowStart",
+              "type": "uint32",
+              "internalType": "uint32"
+            },
+            {
+              "name": "windowEnd",
+              "type": "uint32",
+              "internalType": "uint32"
+            },
+            {
+              "name": "minBalance",
+              "type": "uint256",
+              "internalType": "uint256"
+            }
+          ]
         }
       ],
       "outputs": [
@@ -192,19 +233,6 @@
         }
       ],
       "stateMutability": "nonpayable"
-    },
-    {
-      "type": "function",
-      "name": "currentDay",
-      "inputs": [],
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint32",
-          "internalType": "uint32"
-        }
-      ],
-      "stateMutability": "view"
     },
     {
       "type": "function",
@@ -321,6 +349,26 @@
               "name": "perfectSoFar",
               "type": "bool",
               "internalType": "bool"
+            },
+            {
+              "name": "utcOffsetMinutes",
+              "type": "int16",
+              "internalType": "int16"
+            },
+            {
+              "name": "windowStart",
+              "type": "uint32",
+              "internalType": "uint32"
+            },
+            {
+              "name": "windowEnd",
+              "type": "uint32",
+              "internalType": "uint32"
+            },
+            {
+              "name": "minBalance",
+              "type": "uint256",
+              "internalType": "uint256"
             }
           ]
         }
@@ -367,6 +415,11 @@
           "name": "parentId",
           "type": "uint256",
           "internalType": "uint256"
+        },
+        {
+          "name": "utcOffsetMinutes",
+          "type": "int16",
+          "internalType": "int16"
         }
       ],
       "outputs": [
@@ -377,6 +430,25 @@
         }
       ],
       "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "localDay",
+      "inputs": [
+        {
+          "name": "utcOffsetMinutes",
+          "type": "int16",
+          "internalType": "int16"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32",
+          "internalType": "uint32"
+        }
+      ],
+      "stateMutability": "view"
     },
     {
       "type": "function",
@@ -749,6 +821,30 @@
           "type": "uint32",
           "indexed": false,
           "internalType": "uint32"
+        },
+        {
+          "name": "utcOffsetMinutes",
+          "type": "int16",
+          "indexed": false,
+          "internalType": "int16"
+        },
+        {
+          "name": "windowStart",
+          "type": "uint32",
+          "indexed": false,
+          "internalType": "uint32"
+        },
+        {
+          "name": "windowEnd",
+          "type": "uint32",
+          "indexed": false,
+          "internalType": "uint32"
+        },
+        {
+          "name": "minBalance",
+          "type": "uint256",
+          "indexed": false,
+          "internalType": "uint256"
         }
       ],
       "anonymous": false
@@ -832,6 +928,11 @@
     },
     {
       "type": "error",
+      "name": "BelowMinBalance",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "GoalEnded",
       "inputs": [
         {
@@ -844,6 +945,17 @@
     {
       "type": "error",
       "name": "GoalNotEnded",
+      "inputs": [
+        {
+          "name": "id",
+          "type": "uint256",
+          "internalType": "uint256"
+        }
+      ]
+    },
+    {
+      "type": "error",
+      "name": "GoalNotStarted",
       "inputs": [
         {
           "name": "id",
@@ -870,6 +982,11 @@
     },
     {
       "type": "error",
+      "name": "InsufficientBalanceForRule",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "InvalidDuration",
       "inputs": [
         {
@@ -886,7 +1003,17 @@
     },
     {
       "type": "error",
+      "name": "InvalidMinBalance",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "InvalidNameLength",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "InvalidOffset",
       "inputs": []
     },
     {
@@ -902,6 +1029,16 @@
     },
     {
       "type": "error",
+      "name": "InvalidWindow",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "MinBalanceTooHigh",
+      "inputs": []
+    },
+    {
+      "type": "error",
       "name": "NotGoalOwner",
       "inputs": [
         {
@@ -914,6 +1051,11 @@
     {
       "type": "error",
       "name": "NoteTooLong",
+      "inputs": []
+    },
+    {
+      "type": "error",
+      "name": "OutsideWindow",
       "inputs": []
     },
     {
@@ -947,6 +1089,11 @@
           "internalType": "uint256"
         }
       ]
+    },
+    {
+      "type": "error",
+      "name": "WindowTooShort",
+      "inputs": []
     },
     {
       "type": "error",

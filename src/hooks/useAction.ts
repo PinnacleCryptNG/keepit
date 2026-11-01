@@ -2,15 +2,16 @@ import { createElement, useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { CHAIN_ID } from '@/lib/keepit'
+import { NETWORK_NAME } from '@/lib/brand'
 import { parseError } from '@/lib/format'
 import type { OnStep, Step, TxResult } from '@/lib/types'
 
 export const STEP_LABEL: Record<Step, string> = {
-  switch: 'Switching to Arc Testnet...',
+  switch: `Switching to ${NETWORK_NAME}...`,
   'approve-sign': 'Allow USDC in your wallet...',
   'approve-wait': 'Confirming allowance...',
   sign: 'Confirm in your wallet...',
-  wait: 'Confirming on Arc Testnet...',
+  wait: `Confirming on ${NETWORK_NAME}...`,
 }
 
 /** Runs one onchain (or demo) action and tracks real wallet / confirmation steps. */

@@ -8,7 +8,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title KeepIt
- * @notice Daily habit escrow: deposit all days' USDC up front and check in on each UTC day.
+ * @notice Daily habit escrow: deposit all days' USDC up front and check in on each local day.
  * Every checked day secures that day's stake for refund. Every missed day loses that stake
  * to a shared pool. Only goals that finish every day perfectly receive pool rewards, weighted
  * by their total original stake while they remain unsettled. Pool shares are stream-based:
@@ -18,11 +18,22 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
  * sweepIds so every known elapsed miss is counted before their reward locks. Funds distributed
  * when no weight is active carry to the next goals created.
  * The owner claims the secured principal and locked pool reward together in one transfer.
- * Friend challenges copy the terms but have independent start days, check-ins and payouts.
+ * Friend challenges copy the stake terms and optional on-chain rules, but choose their own
+ * immutable UTC offset and have independent start days, check-ins and payouts. Each goal's
+ * days roll over at local midnight using that fixed offset, without daylight-saving adjustments.
+ * Optional rules require check-ins within a non-wrapping daily local time window and/or
+ * require a minimum USDC balance in the owner's wallet. A zero windowEnd disables the time
+ * rule (windowStart must also be zero); a zero minimum disables the balance rule.
+ * The window only proves the owner's wallet transacted inside the window, not what the owner
+ * was doing or when the signature was produced. The balance rule is a snapshot at check-in
+ * time and can be satisfied by temporarily borrowed funds. Escrowed stake does not count.
+ * Both rules are enforced identically for everyone and are visible on the explorer.
+ * Notes are not evidence used to verify either rule.
  * @dev Intended token: Arc Testnet USDC, 0x3600000000000000000000000000000000000000,
  * with six decimals. The constructor accepts the token explicitly; it does not verify its identity.
- * Day zero is the creation UTC day, even if creation is just before midnight. Notes/photo URLs
- * are public event data, not validated evidence. No administrator, pause, rescue or upgrade exists.
+ * Day zero is always the creation local day, even if its window has already closed.
+ * Notes/photo URLs are public event data, not validated evidence.
+ * No administrator, pause, rescue or upgrade exists.
  *
  * Accounting invariant for the intended non-rebasing, exact-transfer USDC:
  * token balance >= unclaimed goal principals + poolBalance. Unclaimed principals mean each
@@ -45,7 +56,7 @@ contract KeepIt is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant MIN_STAKE_PER_DAY = 10_000;
-    uint256 public constant MAX_STAKE_PER_DAY = 100_000_000;
+    uint256 public constant MAX_STAKE_PER_DAY = 5_000_000;
     uint256 public constant SETTLE_GRACE = 7 days;
     uint256 private constant SCALE = 1e18;
 
@@ -66,6 +77,18 @@ contract KeepIt is ReentrancyGuard {
         bool broken;
         bool settled;
         bool claimed;
+        int16 utcOffsetMinutes;
+        uint32 windowStart;
+        uint32 windowEnd;
+        uint256 minBalance;
+    }
+
+    /// @dev Creation-only rule parameters; no function can modify a goal's stored rules.
+    struct Rules {
+        int16 utcOffsetMinutes;
+        uint32 windowStart;
+        uint32 windowEnd;
+        uint256 minBalance;
     }
 
     struct Metadata {
@@ -73,7 +96,7 @@ contract KeepIt is ReentrancyGuard {
         string emoji;
     }
 
-    /// @notice Frontend projection; elapsedDays excludes today's still-open day.
+    /// @notice Frontend projection; elapsedDays excludes today's still-open local day.
     struct GoalView {
         uint256 id;
         address owner;
@@ -95,6 +118,10 @@ contract KeepIt is ReentrancyGuard {
         bool checkedToday;
         bool ended;
         bool perfectSoFar;
+        int16 utcOffsetMinutes;
+        uint32 windowStart;
+        uint32 windowEnd;
+        uint256 minBalance;
     }
 
     mapping(uint256 => Goal) private _goals;
@@ -130,10 +157,20 @@ contract KeepIt is ReentrancyGuard {
     error AlreadyCheckedIn(uint256 id, uint8 dayIndex);
     error AlreadyClaimed(uint256 id);
     error InexactDeposit();
+    error InvalidWindow();
+    error WindowTooShort();
+    error MinBalanceTooHigh();
+    error InsufficientBalanceForRule();
+    error OutsideWindow();
+    error BelowMinBalance();
+    error GoalNotStarted(uint256 id);
+    error InvalidOffset();
+    error InvalidMinBalance();
 
     event GoalCreated(
         uint256 indexed id, address indexed owner, uint256 parentId,
-        string name, string emoji, uint8 duration, uint256 stakePerDay, uint32 startDay
+        string name, string emoji, uint8 duration, uint256 stakePerDay, uint32 startDay,
+        int16 utcOffsetMinutes, uint32 windowStart, uint32 windowEnd, uint256 minBalance
     );
     event ChallengeJoined(uint256 indexed newId, uint256 indexed parentId, address indexed joiner);
     event CheckedIn(
@@ -154,15 +191,22 @@ contract KeepIt is ReentrancyGuard {
     }
 
     /**
-     * @notice Create a goal starting today and deposit duration * stakePerDay.
+     * @notice Deposit duration * stakePerDay and create a goal with immutable check-in rules.
+     * @dev Starts on the creation local day, even if today's window has already closed.
      * @param name Habit name, 1..48 UTF-8 bytes (not character count).
      * @param emoji Display emoji, 1..16 UTF-8 bytes.
-     * @param duration Exactly 7, 14 or 30 UTC days.
+     * @param duration Exactly 7, 14 or 30 local days.
      * @param stakePerDay Daily stake in USDC base units; approve the full deposit first.
+     * @param rules Fixed UTC offset in minutes [-720, 840], optional local window and minimum
+     * wallet USDC base units. windowEnd zero disables the window and requires windowStart zero;
+     * otherwise windowStart < windowEnd <= 86400. A zero minimum disables the balance rule.
+     * A nonzero minimum must remain in the wallet after deposit and be held at each check-in.
      * @return id Newly allocated goal ID, starting at one.
      */
-    function createGoal(string calldata name, string calldata emoji, uint8 duration, uint256 stakePerDay)
-        external nonReentrant returns (uint256 id)
+    function createGoal(
+        string calldata name, string calldata emoji, uint8 duration, uint256 stakePerDay,
+        Rules calldata rules
+    ) external nonReentrant returns (uint256 id)
     {
         if (bytes(name).length == 0 || bytes(name).length > 48) revert InvalidNameLength();
         if (bytes(emoji).length == 0 || bytes(emoji).length > 16) revert InvalidEmojiLength();
@@ -170,35 +214,53 @@ contract KeepIt is ReentrancyGuard {
         if (stakePerDay < MIN_STAKE_PER_DAY || stakePerDay > MAX_STAKE_PER_DAY) {
             revert InvalidStake(stakePerDay);
         }
-        return _createGoal(name, emoji, duration, stakePerDay, 0);
+        return _createGoal(name, emoji, duration, stakePerDay, 0, rules);
     }
 
     /**
-     * @notice Copy an existing goal's terms into a new, independently owned goal starting today.
+     * @notice Copy a goal's name, emoji, duration, daily stake, window and minimum balance.
      * @dev The parent may be ended, settled, claimed, broken, or owned by the caller.
-     * @param parentId Existing goal whose terms are copied.
+     * Starts on the joiner's creation local day, even if today's copied window has closed.
+     * @param parentId Existing goal whose stake terms, metadata and optional rules are copied.
+     * @param utcOffsetMinutes Joiner's fixed UTC offset in minutes, within [-720, 840].
      * @return id New goal ID; its deposit requires the joiner's allowance.
      */
-    function joinChallenge(uint256 parentId) external nonReentrant returns (uint256 id) {
+    function joinChallenge(uint256 parentId, int16 utcOffsetMinutes)
+        external nonReentrant returns (uint256 id)
+    {
         Goal storage parent = _requireGoal(parentId);
         Metadata storage meta = _metadata[parentId];
-        id = _createGoal(meta.name, meta.emoji, parent.duration, parent.stakePerDay, parentId);
+        id = _createGoal(
+            meta.name, meta.emoji, parent.duration, parent.stakePerDay, parentId,
+            Rules(utcOffsetMinutes, parent.windowStart, parent.windowEnd, parent.minBalance)
+        );
         challengeJoinCount[parentId] += 1;
         emit ChallengeJoined(id, parentId, msg.sender);
     }
 
     /**
-     * @notice Secure today's stake once; past days cannot be backfilled.
+     * @notice Secure today's local-day stake once; past days cannot be backfilled.
+     * @dev The window only proves the owner's wallet transacted inside the window, not what
+     * the owner was doing. Minimum wallet USDC is a snapshot at check-in time, excludes
+     * escrowed funds, and can be satisfied by temporarily borrowed funds.
      * @param id Caller-owned goal.
      * @param note Optional text or photo URL, at most 280 bytes, emitted but not stored.
      */
     function checkIn(uint256 id, string calldata note) external nonReentrant {
         Goal storage g = _requireOwnedGoal(id);
         if (bytes(note).length > 280) revert NoteTooLong();
-        uint256 dayIndex = uint256(currentDay()) - g.startDay;
+        uint256 localTime = _localTime(g.utcOffsetMinutes);
+        uint256 today = localTime / 1 days;
+        if (today < g.startDay) revert GoalNotStarted(id);
+        uint256 dayIndex = today - g.startDay;
         if (dayIndex >= g.duration) revert GoalEnded(id);
         uint32 bit = uint32(1) << uint8(dayIndex);
         if ((g.checkedMask & bit) != 0) revert AlreadyCheckedIn(id, uint8(dayIndex));
+        if (g.windowEnd != 0) {
+            uint256 secondsOfDay = localTime % 1 days;
+            if (secondsOfDay < g.windowStart || secondsOfDay >= g.windowEnd) revert OutsideWindow();
+        }
+        if (g.minBalance != 0 && usdc.balanceOf(msg.sender) < g.minBalance) revert BelowMinBalance();
         g.checkedMask |= bit;
         uint40 timestamp = uint40(block.timestamp);
         checkInTimestamps[id][uint8(dayIndex)] = timestamp;
@@ -207,7 +269,7 @@ contract KeepIt is ReentrancyGuard {
     }
 
     /**
-     * @notice Process all fully elapsed days, at most 30, for any goal.
+     * @notice Process all fully elapsed local days, at most 30, for any goal.
      * @dev Idempotent if nothing new elapsed. Checked days advance processed without a miss.
      * Each new miss emits DayMissed; the first also emits GoalBroken, followed by distribution.
      */
@@ -227,16 +289,17 @@ contract KeepIt is ReentrancyGuard {
 
     /**
      * @notice Lock the reward and remove an ended perfect goal's weight without paying it.
-     * @dev Owner callable at end; others must wait SETTLE_GRACE. Idempotent. Broken goals
-     * lock no reward. Does not flush carry merely because weight was removed; the next
-     * distribution or creation flushes carry.
+     * @dev Owner callable at end; others must wait SETTLE_GRACE from the real end instant.
+     * Idempotent. Broken goals lock no reward. Does not flush carry merely because weight was
+     * removed; the next distribution or creation flushes carry.
      * @param sweepIds Up to 64 goals to process first; target skipped, unknown IDs revert.
      */
     function settle(uint256 id, uint256[] calldata sweepIds) external nonReentrant {
         Goal storage g = _requireGoal(id);
         if (_elapsedDays(g) != g.duration) revert GoalNotEnded(id);
         uint256 endDay = uint256(g.startDay) + g.duration;
-        if (msg.sender != g.owner && block.timestamp < endDay * 1 days + SETTLE_GRACE) {
+        uint256 endInstant = uint256(int256(endDay * 1 days) - int256(g.utcOffsetMinutes) * 60);
+        if (msg.sender != g.owner && block.timestamp < endInstant + SETTLE_GRACE) {
             revert GraceNotElapsed(id);
         }
         _sweepDays(id, sweepIds);
@@ -271,7 +334,8 @@ contract KeepIt is ReentrancyGuard {
         Metadata storage meta = _metadata[id];
         uint8 elapsed = _elapsedDays(g);
         bool ended = elapsed == g.duration;
-        bool checkedToday = !ended && _isChecked(g.checkedMask, elapsed);
+        bool checkedToday = _localTime(g.utcOffsetMinutes) / 1 days >= g.startDay
+            && !ended && _isChecked(g.checkedMask, elapsed);
         v.id = id;
         v.owner = g.owner;
         v.name = meta.name;
@@ -292,6 +356,10 @@ contract KeepIt is ReentrancyGuard {
         v.checkedToday = checkedToday;
         v.ended = ended;
         v.perfectSoFar = _perfectSoFar(g, elapsed);
+        v.utcOffsetMinutes = g.utcOffsetMinutes;
+        v.windowStart = g.windowStart;
+        v.windowEnd = g.windowEnd;
+        v.minBalance = g.minBalance;
     }
 
     /**
@@ -319,9 +387,11 @@ contract KeepIt is ReentrancyGuard {
         return _goalCount;
     }
 
-    /// @notice Current UTC day number since the Unix epoch.
-    function currentDay() public view returns (uint32) {
-        return uint32(block.timestamp / 1 days);
+    /// @notice Current local day number since the Unix epoch for a valid fixed UTC offset.
+    /// @param utcOffsetMinutes Fixed UTC offset in minutes, within [-720, 840].
+    function localDay(int16 utcOffsetMinutes) external view returns (uint32) {
+        _validateOffset(utcOffsetMinutes);
+        return uint32(_localTime(utcOffsetMinutes) / 1 days);
     }
 
     /// @notice Missed stakes not yet paid as pool rewards, including locked rewards and dust.
@@ -337,15 +407,42 @@ contract KeepIt is ReentrancyGuard {
         return (_goalCount, _totalStaked, _totalKept, poolBalance, _totalPaidOut, totalActiveWeight);
     }
 
+    /// @dev Shared validation for creators and joiners, including disabled-window endpoints.
+    function _validateRules(Rules memory rules) private pure {
+        _validateOffset(rules.utcOffsetMinutes);
+        if (rules.windowEnd == 0) {
+            if (rules.windowStart != 0) revert InvalidWindow();
+        } else if (rules.windowStart >= rules.windowEnd || rules.windowEnd > 1 days) {
+            revert InvalidWindow();
+        }
+        if (rules.minBalance > MAX_STAKE_PER_DAY * 1000) revert InvalidMinBalance();
+    }
+
+    /// @dev Offsets are immutable and do not track daylight-saving changes.
+    function _validateOffset(int16 utcOffsetMinutes) private pure {
+        if (utcOffsetMinutes < -720 || utcOffsetMinutes > 840) revert InvalidOffset();
+    }
+
+    /// @dev Apply the fixed offset in signed seconds before converting to local epoch time.
+    function _localTime(int16 utcOffsetMinutes) private view returns (uint256) {
+        return uint256(int256(block.timestamp) + int256(utcOffsetMinutes) * 60);
+    }
+
     /// @dev Register weight/debt before flushing carry; the new goal shares stranded funds.
     function _createGoal(
-        string memory name, string memory emoji, uint8 duration, uint256 stakePerDay, uint256 parentId
+        string memory name, string memory emoji, uint8 duration, uint256 stakePerDay, uint256 parentId,
+        Rules memory rules
     ) private returns (uint256 id) {
+        _validateRules(rules);
         uint256 weight = stakePerDay * duration;
         id = ++_goalCount;
         Goal storage g = _goals[id];
         g.owner = msg.sender;
-        g.startDay = currentDay();
+        g.startDay = uint32(_localTime(rules.utcOffsetMinutes) / 1 days);
+        g.utcOffsetMinutes = rules.utcOffsetMinutes;
+        g.windowStart = rules.windowStart;
+        g.windowEnd = rules.windowEnd;
+        g.minBalance = rules.minBalance;
         g.duration = duration;
         g.stakePerDay = stakePerDay;
         g.parentId = parentId;
@@ -358,7 +455,20 @@ contract KeepIt is ReentrancyGuard {
         uint256 balanceBefore = usdc.balanceOf(address(this));
         usdc.safeTransferFrom(msg.sender, address(this), weight);
         if (usdc.balanceOf(address(this)) != balanceBefore + weight) revert InexactDeposit();
-        emit GoalCreated(id, msg.sender, parentId, name, emoji, duration, stakePerDay, g.startDay);
+        if (rules.minBalance != 0 && usdc.balanceOf(msg.sender) < rules.minBalance) {
+            revert InsufficientBalanceForRule();
+        }
+        _emitGoalCreated(id);
+    }
+
+    /// @dev Emit stored creation fields in a separate stack frame.
+    function _emitGoalCreated(uint256 id) private {
+        Goal storage g = _goals[id];
+        Metadata memory meta = _metadata[id];
+        emit GoalCreated(
+            id, g.owner, g.parentId, meta.name, meta.emoji, g.duration, g.stakePerDay, g.startDay,
+            g.utcOffsetMinutes, g.windowStart, g.windowEnd, g.minBalance
+        );
     }
 
     /// @dev Process supplied goals before locking the target's reward; repeated IDs are harmless.
@@ -447,7 +557,9 @@ contract KeepIt is ReentrancyGuard {
     }
 
     function _elapsedDays(Goal storage g) private view returns (uint8) {
-        uint256 elapsed = uint256(currentDay()) - g.startDay;
+        uint256 today = _localTime(g.utcOffsetMinutes) / 1 days;
+        if (today < g.startDay) return 0;
+        uint256 elapsed = today - g.startDay;
         return elapsed >= g.duration ? g.duration : uint8(elapsed);
     }
 

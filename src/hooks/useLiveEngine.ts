@@ -4,11 +4,11 @@ import { useAccount, usePublicClient, useReadContract, useReadContracts, useSwit
 import { useQueryClient } from '@tanstack/react-query'
 import { keepItAbi } from '@/lib/keepitAbi'
 import { CHAIN_ID, KEEPIT_ADDRESS, USDC_ADDRESS, toKeep } from '@/lib/keepit'
-import { analyze, utcDay, type CreateParams, type Keep, type KeepApi, type OnStep, type Payout, type Stats } from '@/lib/types'
+import { analyze, browserOffsetMin, type CreateParams, type Keep, type KeepApi, type OnStep, type Payout, type Stats } from '@/lib/types'
 
 const WALL_WINDOW = 60
 
-/** Reads and writes the deployed KeepIt contract on Arc Testnet. Queries stay idle while `enabled` is false. */
+/** Reads and writes the deployed KeepIt contract on the configured Arc network. Queries stay idle while `enabled` is false. */
 export function useLiveEngine(enabled: boolean): KeepApi {
   const { address, chainId: walletChain, isConnected } = useAccount()
   const publicClient = usePublicClient({ chainId: CHAIN_ID })
@@ -21,7 +21,6 @@ export function useLiveEngine(enabled: boolean): KeepApi {
     return () => clearInterval(t)
   }, [])
   const poll = enabled ? 15_000 : false
-  const today = utcDay(now)
 
   const balanceQ = useReadContract({
     address: USDC_ADDRESS,
@@ -38,6 +37,15 @@ export function useLiveEngine(enabled: boolean): KeepApi {
     args: address ? [address] : undefined,
     chainId: CHAIN_ID,
     query: { enabled: enabled && !!address, refetchInterval: poll },
+  })
+  // A cheap call that only exists in the current KeepIt version. If it reverts, the address holds an older or different contract.
+  const versionQ = useReadContract({
+    address: KEEPIT_ADDRESS,
+    abi: keepItAbi,
+    functionName: 'localDay',
+    args: [0],
+    chainId: CHAIN_ID,
+    query: { enabled, retry: false, staleTime: Infinity },
   })
   const countQ = useReadContract({
     address: KEEPIT_ADDRESS,
@@ -135,7 +143,7 @@ export function useLiveEngine(enabled: boolean): KeepApi {
   }
   const sweepIdsFor = (target: bigint) =>
     allKeeps
-      .filter((k) => k.id !== target && analyze(k, today).pendingMisses > 0)
+      .filter((k) => k.id !== target && analyze(k, now).pendingMisses > 0)
       .slice(0, 64)
       .map((k) => k.id)
 
@@ -147,7 +155,7 @@ export function useLiveEngine(enabled: boolean): KeepApi {
       address: KEEPIT_ADDRESS,
       abi: keepItAbi,
       functionName: 'createGoal',
-      args: [p.name, p.emoji, p.duration, p.stakePerDay],
+      args: [p.name, p.emoji, p.duration, p.stakePerDay, { utcOffsetMinutes: browserOffsetMin(), windowStart: p.windowStart, windowEnd: p.windowEnd, minBalance: p.minBalance }],
       chainId: CHAIN_ID,
     })
     onStep?.('wait')
@@ -165,7 +173,7 @@ export function useLiveEngine(enabled: boolean): KeepApi {
       address: KEEPIT_ADDRESS,
       abi: keepItAbi,
       functionName: 'joinChallenge',
-      args: [parentId],
+      args: [parentId, browserOffsetMin()],
       chainId: CHAIN_ID,
     })
     onStep?.('wait')
@@ -245,11 +253,14 @@ export function useLiveEngine(enabled: boolean): KeepApi {
     wrongChain,
     switchToArc,
     balance: balanceQ.data,
-    today,
+    now,
     myKeeps,
     allKeeps,
     stats,
     loading: enabled && (countQ.isLoading || goalsQ.isLoading || (!!address && myIdsQ.isLoading)),
+    incompatible: enabled && versionQ.isError && /revert/i.test(versionQ.error?.message ?? ''),
+    error: enabled && (countQ.isError || goalsQ.isError || statsQ.isError || (!!address && myIdsQ.isError)),
+    refetch: () => void refresh(),
     create,
     checkIn,
     claim,

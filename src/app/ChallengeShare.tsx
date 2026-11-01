@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Check, Copy, Share2, Users } from 'lucide-react'
+import { Check, Link2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { getShareBase } from '@/lib/share'
 import { usd } from '@/lib/format'
 import type { Keep, Mode } from '@/lib/types'
 
+/** Invite friends: one button copies the challenge link, a second opens the share sheet where supported. */
 export function ChallengeShare({ keep, mode }: { keep: Keep; mode: Mode }) {
   const [base, setBase] = useState<string>()
   const [copied, setCopied] = useState(false)
@@ -27,7 +28,7 @@ export function ChallengeShare({ keep, mode }: { keep: Keep; mode: Mode }) {
       toast.success('Challenge link copied')
       setTimeout(() => setCopied(false), 1800)
     } catch {
-      toast.error('Could not copy. Select the link and copy it manually.')
+      toast.error('Could not copy the link.')
     }
   }
   const share = async () => {
@@ -39,25 +40,15 @@ export function ChallengeShare({ keep, mode }: { keep: Keep; mode: Mode }) {
   }
 
   return (
-    <section className="card space-y-3 p-4">
-      <div className="flex items-center gap-2">
-        <div className="flex size-9 items-center justify-center rounded-xl" style={{ background: 'var(--flame-soft)' }}><Users size={18} /></div>
-        <div className="text-sm">
-          <div className="font-semibold">Challenge a friend</div>
-          <div style={{ color: 'var(--muted)' }}>Same goal, {keep.duration} days, {usd(keep.stakePerDay)}/day. Their own stake.</div>
-        </div>
-      </div>
-      <div className="inner mono truncate px-3 py-2 text-xs" style={{ color: 'var(--muted)' }}>{link || 'Preparing link...'}</div>
-      <div className="flex gap-2">
-        <button className="btn btn-ghost flex-1" disabled={!link} onClick={() => void copy()}>
-          {copied ? <Check size={16} /> : <Copy size={16} />} {copied ? 'Copied' : 'Copy link'}
+    <div className="flex gap-2">
+      <button className="btn flex-1" disabled={!link} onClick={() => void copy()}>
+        {copied ? <Check size={17} /> : <Link2 size={17} />} {copied ? 'Link copied' : 'Invite friends'}
+      </button>
+      {canShare && (
+        <button className="btn btn-icon" disabled={!link} onClick={() => void share()} aria-label="Share challenge">
+          <Share2 size={17} />
         </button>
-        {canShare && (
-          <button className="btn btn-primary flex-1" disabled={!link} onClick={() => void share()}>
-            <Share2 size={16} /> Share
-          </button>
-        )}
-      </div>
-    </section>
+      )}
+    </div>
   )
 }
