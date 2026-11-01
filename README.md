@@ -28,7 +28,7 @@ Demo mode is on by default. It comes with a couple of sample goals, a sample wal
 - Network: Arc mainnet (chain ID 5042)
 - Token: USDC at `0x3600000000000000000000000000000000000000`
 - KeepIt contract: `0x3c8f6a0f5603a3299c037b6af7d2586d3930b689`
-- Explorer: https://explorer.arc.io/address/0x58E881aD141ac1772a8b7E82d5e2CaA37b1E7c4E
+- Explorer: https://explorer.arc.io/address/0x07B4b725599165710a4816bC8Ae8c5A7B658cF74
 
 Arc mainnet · real USDC · unaudited, small amounts only (max $5/day).
 

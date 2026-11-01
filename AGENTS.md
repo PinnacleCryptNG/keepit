@@ -8,7 +8,8 @@ KeepIt is a habit-staking app on Arc mainnet (real USDC, unaudited, max $5/day).
 
 ## Deployed Contracts
 
-- KeepIt (Arc mainnet, chain 5042): `0x58E881aD141ac1772a8b7E82d5e2CaA37b1E7c4E` (WARNING: this deployment is the older v1 contract, not the v2 this app is built for. The app shows "Contract version mismatch" until a v2 address replaces it.)
+- KeepIt (Arc mainnet, chain 5042): `0x07B4b725599165710a4816bC8Ae8c5A7B658cF74` (v2, MAX_STAKE_PER_DAY = $5; bytecode matches `contracts/KeepIt.sol`)
+- Superseded: `0x58E881aD141ac1772a8b7E82d5e2CaA37b1E7c4E` is an older v1 deployment and is unused.
 - Previous Arc Testnet v2: `0x5fae40e4e2becddf868dca65ed109a7bb88b91e2`
   - Constructor arg: USDC `0x3600000000000000000000000000000000000000`
   - Address lives in `.env` as `VITE_KEEPIT_ADDRESS` (restart Vite after changing it).
