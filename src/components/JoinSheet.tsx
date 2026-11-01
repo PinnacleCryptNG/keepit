@@ -69,7 +69,7 @@ export function JoinSheet({ api, parentId, onClose, onJoined }: Props) {
               {parent === undefined ? (
                 <div className="space-y-2"><div className="skeleton h-10" /><div className="skeleton h-20" /></div>
               ) : parent === null ? (
-                <p className="py-4 text-sm" style={{ color: 'var(--muted)' }}>This challenge link points to a goal that does not exist{mode === 'demo' ? ' in the demo' : ' on Arc Testnet'}.</p>
+                <p className="py-4 text-sm" style={{ color: 'var(--muted)' }}>This challenge link points to a goal that does not exist{mode === 'demo' ? ' in the demo' : ' on Arc mainnet'}.</p>
               ) : (
                 <>
                   <div className="flex items-center gap-3">

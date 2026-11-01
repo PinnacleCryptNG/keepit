@@ -105,7 +105,7 @@ export default function App() {
                   {mode === 'live' && !api.connected ? (
                     <div className="card space-y-3 p-6 text-center">
                       <Wallet className="mx-auto" size={28} />
-                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Connect your wallet to see your keeps on Arc Testnet.</p>
+                      <p className="text-sm" style={{ color: 'var(--muted)' }}>Connect your wallet to see your keeps on Arc mainnet.</p>
                       <ConnectKitButton.Custom>
                         {({ show }) => <button className="btn btn-primary" onClick={show}>Connect wallet</button>}
                       </ConnectKitButton.Custom>
@@ -134,7 +134,7 @@ export default function App() {
         </main>
 
         <footer className="mt-8 space-y-1 text-center text-xs" style={{ color: 'var(--subtle)' }}>
-          <p>Arc Testnet · USDC only · no real money</p>
+          <p>Arc mainnet · real USDC · unaudited, small amounts only (max $5/day)</p>
           <a href={buildAddressExplorerUrl(CHAIN_ID, KEEPIT_ADDRESS)} target="_blank" rel="noreferrer" className="mono inline-flex items-center gap-1" style={{ color: 'var(--link)' }}>
             KeepIt contract {KEEPIT_ADDRESS.slice(0, 8)}...{KEEPIT_ADDRESS.slice(-6)} <ExternalLink size={11} />
           </a>

@@ -40,7 +40,7 @@ export function parseError(error: unknown): string | null {
   const lower = msg.toLowerCase()
   if (lower.includes('user rejected') || lower.includes('user denied') || lower.includes('rejected the request')) return null
   for (const [name, copy] of Object.entries(ERROR_COPY)) if (msg.includes(name)) return copy
-  if (lower.includes('insufficient') || lower.includes('exceeds balance')) return 'Not enough USDC. Use "Get test USDC" in the sidebar.'
+  if (lower.includes('insufficient') || lower.includes('exceeds balance')) return 'Not enough USDC on Arc mainnet.'
   if (lower.includes('network') || lower.includes('timeout') || lower.includes('fetch')) return 'Network issue. Check your connection and retry.'
   return 'Transaction failed. Please try again.'
 }

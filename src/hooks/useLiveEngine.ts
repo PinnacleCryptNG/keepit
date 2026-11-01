@@ -8,7 +8,7 @@ import { analyze, utcDay, type CreateParams, type Keep, type KeepApi, type OnSte
 
 const WALL_WINDOW = 60
 
-/** Reads and writes the deployed KeepIt contract on Arc Testnet. Queries stay idle while `enabled` is false. */
+/** Reads and writes the deployed KeepIt contract on Arc mainnet. Queries stay idle while `enabled` is false. */
 export function useLiveEngine(enabled: boolean): KeepApi {
   const { address, chainId: walletChain, isConnected } = useAccount()
   const publicClient = usePublicClient({ chainId: CHAIN_ID })

@@ -1,13 +1,13 @@
 import type { ReadContractReturnType } from 'viem'
-import { arcTestnet } from 'viem/chains'
+import { arc } from 'viem/chains'
 import { getUsdc } from '@/onchain-facts'
 import { keepItAbi } from './keepitAbi'
 import type { Keep } from './types'
 
-export const CHAIN_ID = arcTestnet.id
+export const CHAIN_ID = arc.id
 export const KEEPIT_ADDRESS = import.meta.env.VITE_KEEPIT_ADDRESS as `0x${string}`
 const usdcFact = getUsdc(CHAIN_ID)
-if (!usdcFact) throw new Error('USDC is not registered for Arc Testnet')
+if (!usdcFact) throw new Error('USDC is not registered for Arc')
 export const USDC_ADDRESS = usdcFact.address as `0x${string}`
 
 export const DURATIONS = [7, 14, 30] as const
