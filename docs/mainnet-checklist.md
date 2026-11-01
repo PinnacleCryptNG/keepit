@@ -76,7 +76,7 @@ VITE_X_HANDLE=yourhandle
 VITE_WALLETCONNECT_PROJECT_ID=...   # optional, free from cloud.reown.com
 ```
 
-- Any value other than `5042` keeps the app on Arc Testnet, so a typo cannot point it at real funds by accident.
+- The app is built for Arc mainnet only. It refuses to start if `VITE_CHAIN_ID` is set to anything other than `5042`, so a typo cannot point it at another network.
 - With `5042` the app switches to the Arc mainnet RPC and explorer, drops the faucet links, and the FAQ and terms say stakes are real USDC.
 - Rebuild and redeploy the site (`bunx vite build`), then open it and check the network name and the contract link in the footer.
 - Wallets will prompt users to add or switch to Arc (chain 5042).

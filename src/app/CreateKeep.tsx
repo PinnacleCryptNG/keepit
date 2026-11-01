@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { fireConfetti } from '@/lib/confetti'
-import { usd } from '@/lib/format'
-import { DURATIONS, MAX_STAKE_PER_DAY } from '@/lib/keepit'
+import { span, usd } from '@/lib/format'
+import { DURATIONS, MAX_STAKE_PER_DAY, MIN_STAKE_PER_DAY } from '@/lib/keepit'
 import { useWalletModal } from '@/lib/walletModal'
 import { parseUsdc } from '@/onchain-money'
-import { browserOffsetMin, gate, type Keep, type KeepApi } from '@/lib/types'
+import { browserOffsetMin, secondsOfDay, type Keep, type KeepApi } from '@/lib/types'
 import { useAction } from '@/hooks/useAction'
 import { useNow } from '@/hooks/useNow'
 
@@ -19,8 +19,6 @@ const TEMPLATES: { id: Template; emoji: string; title: string; hint: string }[] 
 ]
 const HONOR_EMOJIS = ['📚', '🏃', '🧘', '💧', '🥗', '💻', '😴', '🎸']
 const STAKES = ['0.5', '1', '2', '5']
-const MIN_STAKE = 10_000n
-const MAX_STAKE = MAX_STAKE_PER_DAY
 
 const hhmm = (sec: number) => `${String(Math.floor(sec / 3600)).padStart(2, '0')}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}`
 /** A two-hour window that contains the current local time, so a new keep can check in right away. */
@@ -57,7 +55,10 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
   const [to, setTo] = useState(initialWindow[1])
   const [bal, setBal] = useState('50')
   const [duration, setDuration] = useState<number>(14)
-  const [stake, setStake] = useState('1')
+  // A preset chip and the free-text "Other" box are separate inputs, so typing in one never lights up the other.
+  const [preset, setPreset] = useState<string | null>('1')
+  const [custom, setCustom] = useState('')
+  const stakeText = preset ?? custom
   const action = useAction()
   const realNow = useNow(30_000)
   const { open: openWallet } = useWalletModal()
@@ -75,12 +76,16 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
   }
 
   const stakeRaw = useMemo(() => {
+    // Accept decimals that are still being typed: ".5" and "2." are read as 0.5 and 2.
+    let text = stakeText.trim()
+    if (text.startsWith('.')) text = `0${text}`
+    if (text.endsWith('.')) text = text.slice(0, -1)
     try {
-      return parseUsdc(stake)
+      return parseUsdc(text)
     } catch {
       return null
     }
-  }, [stake])
+  }, [stakeText])
   const balRaw = useMemo(() => {
     try {
       return parseUsdc(bal)
@@ -91,7 +96,7 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
 
   const nameBytes = new TextEncoder().encode(name.trim()).length
   const nameOk = nameBytes >= 1 && nameBytes <= 48
-  const validStake = stakeRaw !== null && stakeRaw >= MIN_STAKE && stakeRaw <= MAX_STAKE ? stakeRaw : null
+  const validStake = stakeRaw !== null && stakeRaw >= MIN_STAKE_PER_DAY && stakeRaw <= MAX_STAKE_PER_DAY ? stakeRaw : null
   const total = validStake !== null ? validStake * BigInt(duration) : 0n
   const winStart = toSec(from)
   const winEnd = toSec(to)
@@ -104,13 +109,16 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
     minBalance: useBalance && balRaw !== null && balValid ? balRaw : 0n,
   }
   const preview = { utcOffsetMin: browserOffsetMin(), ...rules } as Keep
-  const windowClosedNow = useWindow && winOk && gate(preview, demo ? api.now : realNow).windowOpen === false
+  // The contract always makes the day you stake day 1, so a window that has already closed today would waste day 1.
+  const clockNow = demo ? api.now : realNow
+  const windowClosedToday = useWindow && winOk && secondsOfDay(preview, clockNow) >= winEnd
+  const secondsToMidnight = 86_400 - secondsOfDay(preview, clockNow)
   const insufficient = validStake !== null && api.balance !== undefined && api.balance < total
   const after = api.balance !== undefined ? api.balance - total : undefined
   const belowAtStart = rules.minBalance > 0n && after !== undefined && after < rules.minBalance
 
   const ready = nameOk && validStake !== null && winOk && balValid
-  const blocked = api.incompatible || (!needsWallet && (!ready || insufficient || belowAtStart))
+  const blocked = api.incompatible || windowClosedToday || (!needsWallet && (!ready || insufficient || belowAtStart))
 
   const submit = async () => {
     if (needsWallet) return openWallet()
@@ -122,7 +130,7 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
     }
   }
 
-  const cta = action.busy ? null : needsWallet ? 'Connect wallet' : api.incompatible ? 'Contract version mismatch' : !nameOk ? 'Name your habit' : !winOk ? 'Fix the window' : !balValid ? 'Fix the balance' : validStake === null ? 'Set a daily stake' : insufficient ? 'Not enough USDC' : belowAtStart ? 'Balance rule not met' : `Stake ${usd(total)}`
+  const cta = action.busy ? null : needsWallet ? 'Connect wallet' : api.incompatible ? 'Contract version mismatch' : windowClosedToday ? 'Starts tomorrow' : !nameOk ? 'Name your habit' : !winOk ? 'Fix the window' : !balValid ? 'Fix the balance' : validStake === null ? 'Set a daily stake' : insufficient ? 'Not enough USDC' : belowAtStart ? 'Balance rule not met' : `Stake ${usd(total)}`
 
   return (
     <div className="space-y-8">
@@ -204,24 +212,27 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
           <div className="mb-2 text-sm font-bold">Stake per day</div>
           <div className="flex flex-wrap items-center gap-2">
             {STAKES.map((s) => (
-              <button key={s} className="chip" aria-pressed={stake === s} onClick={() => setStake(s)}>${Number(s).toFixed(2)}</button>
+              <button key={s} className="chip" aria-pressed={preset === s} onClick={() => { setPreset(s); setCustom('') }}>${Number(s).toFixed(2)}</button>
             ))}
-            <label className="flex min-h-[44px] items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--card)] px-4">
+            <label className="flex min-h-[44px] items-center gap-1 rounded-full border bg-[var(--card)] px-4" style={{ borderColor: preset === null && custom !== '' ? 'var(--ember)' : 'var(--line)' }}>
               <span className="font-bold text-faint">$</span>
               <input
                 aria-label="Custom daily stake"
                 inputMode="decimal"
                 className="w-16 bg-transparent text-base font-bold tnum outline-none"
-                value={STAKES.includes(stake) ? '' : stake}
+                value={custom}
                 placeholder="Other"
                 onChange={(e) => {
                   const v = e.target.value.replace(/[^0-9.]/g, '')
-                  if (/^\d*\.?\d{0,6}$/.test(v)) setStake(v)
+                  if (/^\d*\.?\d{0,6}$/.test(v)) {
+                    setCustom(v)
+                    setPreset(null)
+                  }
                 }}
               />
             </label>
           </div>
-          {stake !== '' && validStake === null && <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--berry)' }}>Stake between $0.01 and $5 a day.</p>}
+          {stakeText !== '' && validStake === null && <p className="mt-2 text-sm font-semibold" style={{ color: 'var(--berry)' }}>Stake between $0.01 and $5 a day.</p>}
         </div>
         <p className="text-sm text-muted">
           Keep every day and you get {usd(total)} back plus a share of the pool. Miss a day and that day's stake goes to the pool.
@@ -229,9 +240,12 @@ export function CreateKeep({ api, onCreated }: { api: KeepApi; onCreated: () => 
       </Step>
 
       <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-20 space-y-2 sm:bottom-4">
-        {windowClosedNow && (
+        {windowClosedToday && (
           <p className="flex gap-2 rounded-xl bg-[color-mix(in_srgb,var(--sun)_35%,var(--card))] p-3 text-sm font-semibold">
-            <AlertTriangle size={16} className="mt-0.5 shrink-0" /> Today's window is closed, so day 1 will count as missed.
+            <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+            <span>
+              Your keep starts tomorrow. Today's window has closed, so you can stake once your day rolls over in {span(secondsToMidnight)}. Or change the window above.
+            </span>
           </p>
         )}
         {belowAtStart && (

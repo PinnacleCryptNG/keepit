@@ -25,7 +25,7 @@ KeepIt is a habit-staking app on Arc mainnet (real USDC, unaudited, max $5/day).
 ## Tech Stack
 
 - Frontend: React 18, Vite, TypeScript, Tailwind CSS v3, framer-motion
-- Web3: wagmi v2, viem, ConnectKit (injected wallets)
+- Web3: wagmi v2, viem; own wallet picker (EIP-6963 wallets, optional WalletConnect)
 - Contracts: Solidity 0.8.28 + Foundry in `contracts/`
 - Chain: Arc mainnet; money in the 6-decimal USDC ERC-20 view only (use `@/onchain-money`)
 

@@ -4,11 +4,9 @@ import { CHAIN_ID } from './keepit'
 const chain = requireChain(CHAIN_ID)
 
 /** Name of the network the contract is deployed to. Copy reads from here. */
-export const NETWORK_NAME = chain.isTestnet ? chain.name : `${chain.name} mainnet`
+export const NETWORK_NAME = `${chain.name} mainnet`
 /** The one-line status shown wherever the network or the money is mentioned. */
 export const STATUS_LINE = 'Arc mainnet · real USDC · unaudited, small amounts only (max $5/day)'
-/** True while the app points at a test network. Switches the money-related copy. */
-export const IS_TESTNET = chain.isTestnet
 
 /** Optional public links, set in `.env`. A link is only shown when its variable is set. */
 export const REPO_URL = (import.meta.env.VITE_REPO_URL as string | undefined) || undefined

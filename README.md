@@ -6,7 +6,7 @@ Built with [Arc Studio](https://studio.arc.io)
 
 ## What you can do
 
-- Connect a wallet and see your USDC balance on Arc mainnet.
+- Connect a wallet and see your USDC balance on Arc Mainnet.
 - Create a goal with a name, emoji, length (7, 14 or 30 days) and a daily stake. The full stake goes into escrow.
 - Set rules the contract enforces at check-in: a daily time window, a minimum wallet balance, or both. A flame lights up for every day kept and a crack marks every day missed.
 - Watch your streak and how much of your money is still safe.
@@ -21,16 +21,16 @@ The mark is a warm gradient tile with a cream flame and a check cut out of it. T
 
 ## Demo mode
 
-Demo mode is on by default. It comes with a couple of sample goals, a sample wall, a pool and 25 practice USDC, so you can explore without waiting days or spending anything. Use **Skip a day** to watch unchecked goals crack and the pool grow, then **Reset** to start over. The landing page also has a small playable example card. Flip the **Live** switch in the header to use the real contract on Arc Testnet with your own wallet.
+Demo mode is on by default. It comes with a couple of sample goals, a sample wall, a pool and 25 practice USDC, so you can explore without waiting days or spending anything. Use **Skip a day** to watch unchecked goals crack and the pool grow, then **Reset** to start over. The landing page also has a small playable example card. Open the account menu and flip **Live** to use the real contract on Arc Mainnet with your own wallet.
 
 ## Contract
 
-- Network: Arc mainnet (chain ID 5042)
+- Network: Arc Mainnet (chain ID 5042)
 - Token: USDC at `0x3600000000000000000000000000000000000000`
-- KeepIt contract: `0x3c8f6a0f5603a3299c037b6af7d2586d3930b689`
+- KeepIt contract: `0x07B4b725599165710a4816bC8Ae8c5A7B658cF74`
 - Explorer: https://explorer.arc.io/address/0x07B4b725599165710a4816bC8Ae8c5A7B658cF74
 
-Arc mainnet · real USDC · unaudited, small amounts only (max $5/day).
+Arc Mainnet · real USDC · unaudited, small amounts only (max $5/day).
 
 ## How payouts work
 
@@ -48,7 +48,7 @@ The contract checks your window and balance rules when you check in. It can prov
 
 ## Tech stack
 
-React 18, Vite, TypeScript, Tailwind CSS, wagmi, viem and ConnectKit for the app. Solidity 0.8.28 with Foundry and OpenZeppelin for the contract. Network: Arc mainnet.
+React 18, Vite, TypeScript, Tailwind CSS, wagmi and viem for the app. Solidity 0.8.28 with Foundry and OpenZeppelin for the contract. Network: Arc Mainnet.
 
 ## Development
 
@@ -67,7 +67,7 @@ bun run assets            # regenerate the logo, favicon, app icons and share im
 
 | Name | Purpose |
 | --- | --- |
-| `VITE_CHAIN_ID` | Must be `5042` (Arc mainnet). The app refuses to start with any other value. |
+| `VITE_CHAIN_ID` | Must be `5042` (Arc Mainnet). The app refuses to start with any other value. |
 | `VITE_KEEPIT_ADDRESS` | Address of the deployed KeepIt contract the app talks to. |
 | `VITE_WALLETCONNECT_PROJECT_ID` | Optional. A free project id from cloud.reown.com that adds WalletConnect (phone wallets, QR code) to the wallet picker. |
 | `VITE_REPO_URL` | Optional. Public source repository. Shown in the footer and security notes only when set. |
@@ -78,7 +78,7 @@ Restart the dev server after changing `.env`.
 
 ### Use your own contract
 
-Compile the contract with `bun run contracts:build`, deploy `contracts/KeepIt.sol` to Arc Testnet with the USDC address above as its only constructor argument, and set `VITE_KEEPIT_ADDRESS` to the new address.
+Compile the contract with `bun run contracts:build`, deploy it with `contracts/script/DeployKeepIt.s.sol` (the USDC address above is its only constructor argument), and set `VITE_KEEPIT_ADDRESS` to the new address. Stake limits in `src/lib/keepit.ts` must match the deployed contract.
 
 ## Going to mainnet
 
